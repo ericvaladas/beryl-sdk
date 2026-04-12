@@ -7,6 +7,7 @@ export const MessageType = {
   WALK: 0x03,
   READ_MEMORY: 0x04,
   WRITE_MEMORY: 0x05,
+  READY: 0x07,
 } as const;
 
 interface PendingMemory {
@@ -20,44 +21,39 @@ export type ClientEvents = {
   close: () => void;
 };
 
-interface Registry {
-  readFile(path: string): Promise<ArrayBuffer>;
-}
-
 export class Client extends EventEmitter<ClientEvents> {
   readonly pid: number;
   readonly port: number;
-  private registry: Registry;
+  readonly readFile: (path: string) => Promise<ArrayBuffer>;
   private ws: WebSocket | null = null;
   private _nextRequestId = 0;
   private _pendingMemory = new Map<number, PendingMemory>();
+  private _onReady: (() => void) | null = null;
 
-  constructor(pid: number, port: number, registry: Registry) {
+  constructor(pid: number, port: number, readFile: (path: string) => Promise<ArrayBuffer>) {
     super();
     this.pid = pid;
     this.port = port;
-    this.registry = registry;
-  }
-
-  readFile(path: string): Promise<ArrayBuffer> {
-    return this.registry.readFile(path);
+    this.readFile = readFile;
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(`ws://localhost:${this.port}`);
       this.ws.binaryType = 'arraybuffer';
-      this.ws.onopen = () => resolve();
+      this._onReady = resolve;
 
       this.ws.onmessage = (event: MessageEvent) => {
         this.onMessage(event.data as ArrayBuffer);
       };
 
       this.ws.onclose = () => {
+        this._onReady = null;
         this.close();
       };
 
       this.ws.onerror = () => {
+        this._onReady = null;
         reject(new Error(`WebSocket error connecting to port ${this.port}`));
       };
     });
@@ -67,6 +63,14 @@ export class Client extends EventEmitter<ClientEvents> {
     const raw = new Uint8Array(data);
     const type = raw[0];
     const body = raw.slice(1);
+
+    if (type === MessageType.READY) {
+      if (this._onReady) {
+        this._onReady();
+        this._onReady = null;
+      }
+      return;
+    }
 
     if (type === MessageType.CLIENT) {
       this.emit('clientPacket', new ClientPacket(body));
