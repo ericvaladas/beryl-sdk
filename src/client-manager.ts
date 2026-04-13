@@ -1,5 +1,5 @@
 import { Client } from './client';
-import type { ClientDescriptor } from './types';
+import type { ClientDescriptor, Settings } from './types';
 
 const REGISTRY_URL = 'ws://localhost:21000';
 const RECONNECT_INTERVAL = 2000;
@@ -40,6 +40,7 @@ export class ClientManager {
   private hasScanned = false;
   private _nextFileId = 1;
   private _pendingFiles = new Map<number, PendingFile>();
+  private _pendingSettings: ((settings: Settings) => void) | null = null;
 
   constructor(options: ClientManagerOptions) {
     this.options = options;
@@ -71,6 +72,13 @@ export class ClientManager {
         case 'remove':
           this.handleRemove(message.pid);
           break;
+        case 'settings':
+          if (this._pendingSettings) {
+            const { type, ...settings } = message;
+            this._pendingSettings(settings as Settings);
+            this._pendingSettings = null;
+          }
+          break;
       }
     };
 
@@ -100,6 +108,22 @@ export class ClientManager {
       this._pendingFiles.set(id, { resolve, reject });
       this.ws!.send(JSON.stringify({ type: 'file', id, path }));
     });
+  }
+
+  getAllowedOrigins(): Promise<string[]> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error('WebSocket not connected'));
+    }
+
+    return new Promise((resolve) => {
+      this._pendingSettings = (settings) => resolve(settings.allowedOrigins ?? []);
+      this.ws!.send(JSON.stringify({ type: 'getSettings' }));
+    });
+  }
+
+  setAllowedOrigins(origins: string[]): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: 'setSettings', allowedOrigins: origins }));
   }
 
   getClient(pid: number): Client | undefined {
