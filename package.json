@@ -1,5 +1,5 @@
 {
-  "name": "beryl-client",
+  "name": "@ericvaladas/beryl-client",
   "version": "0.1.0",
   "description": "WebSocket client library for communicating with the beryl-agent DLL",
   "type": "module",
@@ -20,6 +20,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "prepare": "tsup"
+  },
+  "publishConfig": {
+    "@ericvaladas:registry": "https://npm.pkg.github.com"
   },
   "devDependencies": {
     "tsup": "^8.4.0",
