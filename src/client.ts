@@ -1,4 +1,4 @@
-import { ClientPacket, ServerPacket } from './packet';
+import { Packet } from './packet';
 import EventEmitter from './event-emitter';
 
 export const MessageType = {
@@ -16,8 +16,8 @@ interface PendingMemory {
 }
 
 export type ClientEvents = {
-  clientPacket: (packet: ClientPacket) => void;
-  serverPacket: (packet: ServerPacket) => void;
+  sent: (packet: Packet) => void;
+  received: (packet: Packet) => void;
   close: () => void;
 };
 
@@ -73,9 +73,9 @@ export class Client extends EventEmitter<ClientEvents> {
     }
 
     if (type === MessageType.CLIENT) {
-      this.emit('clientPacket', new ClientPacket(body));
+      this.emit('sent', new Packet(body));
     } else if (type === MessageType.SERVER) {
-      this.emit('serverPacket', new ServerPacket(body));
+      this.emit('received', new Packet(body));
     } else if (type === MessageType.READ_MEMORY || type === MessageType.WRITE_MEMORY) {
       const requestId = body[0];
       const pending = this._pendingMemory.get(requestId);
@@ -90,10 +90,17 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-  send(packet: ClientPacket | ServerPacket): void {
+  send(packet: Packet): void {
+    this.sendFramed(MessageType.CLIENT, packet);
+  }
+
+  receive(packet: Packet): void {
+    this.sendFramed(MessageType.SERVER, packet);
+  }
+
+  private sendFramed(type: number, packet: Packet): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
-    const type = packet instanceof ClientPacket ? MessageType.CLIENT : MessageType.SERVER;
     const body = packet.buffer();
     const frame = new Uint8Array(1 + body.length);
     frame[0] = type;

@@ -1,7 +1,7 @@
 {
-  "name": "@ericvaladas/beryl-client",
-  "version": "0.1.0",
-  "description": "WebSocket client library for communicating with the beryl-agent DLL",
+  "name": "@ericvaladas/beryl",
+  "version": "0.8.0",
+  "description": "TypeScript SDK for building Dark Ages tools",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
