@@ -1,4 +1,5 @@
-export { ClientManager as BerylClient } from './client-manager';
-export type { ClientManagerOptions as BerylClientOptions } from './client-manager';
+export { Beryl } from './beryl';
+export type { BerylEvents } from './beryl';
 export { Client } from './client';
-export { Packet, ClientPacket, ServerPacket } from './packet';
+export type { ClientEvents } from './client';
+export { Packet } from './packet';

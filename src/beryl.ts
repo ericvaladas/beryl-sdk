@@ -1,4 +1,5 @@
 import { Client } from './client';
+import EventEmitter from './event-emitter';
 import type { ClientDescriptor, Settings } from './types';
 
 const REGISTRY_URL = 'ws://localhost:21000';
@@ -21,19 +22,18 @@ function promoteToRegistry(port: number): Promise<void> {
   });
 }
 
-export interface ClientManagerOptions {
-  onReady?: () => void;
-  onClientConnected: (data: { client: Client; name: string }) => void;
-  onClientDisconnected: (data: { pid: number }) => void;
-}
+export type BerylEvents = {
+  ready: () => void;
+  clientConnected: (data: { client: Client; name: string }) => void;
+  clientDisconnected: (data: { pid: number }) => void;
+};
 
 interface PendingFile {
   resolve: (value: ArrayBuffer) => void;
   reject: (reason: Error) => void;
 }
 
-export class ClientManager {
-  private options: ClientManagerOptions;
+export class Beryl extends EventEmitter<BerylEvents> {
   private clientMap = new Map<number, Client>();
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -41,9 +41,10 @@ export class ClientManager {
   private _nextFileId = 1;
   private _pendingFiles = new Map<number, PendingFile>();
   private _pendingSettings: ((settings: Settings) => void) | null = null;
+  private _ready = false;
 
-  constructor(options: ClientManagerOptions) {
-    this.options = options;
+  get ready(): boolean {
+    return this._ready;
   }
 
   connect(): void {
@@ -52,7 +53,8 @@ export class ClientManager {
 
     this.ws.onopen = () => {
       this.hasScanned = false;
-      this.options.onReady?.();
+      this._ready = true;
+      this.emit('ready');
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
@@ -83,6 +85,7 @@ export class ClientManager {
     };
 
     this.ws.onclose = () => {
+      this._ready = false;
       for (const [, { reject }] of this._pendingFiles) {
         reject(new Error('WebSocket disconnected'));
       }
@@ -160,7 +163,7 @@ export class ClientManager {
 
       client.on('close', () => {
         this.clientMap.delete(pid);
-        this.options.onClientDisconnected({ pid });
+        this.emit('clientDisconnected', { pid });
       });
 
       this.clientMap.set(pid, client);
@@ -168,14 +171,14 @@ export class ClientManager {
       client
         .connect()
         .then(() => {
-          this.options.onClientConnected({ client: client!, name });
+          this.emit('clientConnected', { client: client!, name });
         })
         .catch((err) => {
           console.error(`Failed to connect to client PID ${pid}:`, err);
           this.clientMap.delete(pid);
         });
     } else {
-      this.options.onClientConnected({ client, name });
+      this.emit('clientConnected', { client, name });
     }
   }
 

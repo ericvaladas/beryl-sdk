@@ -257,7 +257,3 @@ export class Packet {
     this.position += buffer.length + 2;
   }
 }
-
-export class ClientPacket extends Packet {}
-
-export class ServerPacket extends Packet {}
