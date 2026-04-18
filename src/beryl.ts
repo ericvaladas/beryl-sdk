@@ -1,4 +1,4 @@
-import { Client } from './client';
+import { Client, MessageType } from './client';
 import EventEmitter from './event-emitter';
 import type { ClientDescriptor, Settings } from './types';
 
@@ -6,14 +6,13 @@ const REGISTRY_URL = 'ws://localhost:21000';
 const RECONNECT_INTERVAL = 2000;
 const CLIENT_PORT_START = 21001;
 const CLIENT_PORT_END = 21020;
-const MSG_BECOME_REG = 0x06;
 
 function promoteToRegistry(port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}`);
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => {
-      ws.send(new Uint8Array([MSG_BECOME_REG]));
+      ws.send(new Uint8Array([MessageType.BECOME_REGISTRY]));
       ws.close();
       resolve();
     };
@@ -91,7 +90,10 @@ export class Beryl extends EventEmitter<BerylEvents> {
       }
       this._pendingFiles.clear();
 
-      if (!this.hasScanned) {
+      const existing = this.clientMap.values().next().value;
+      if (existing) {
+        existing.becomeRegistry();
+      } else if (!this.hasScanned) {
         this.hasScanned = true;
         this.scanForClients();
       }

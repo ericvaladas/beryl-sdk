@@ -7,6 +7,7 @@ export const MessageType = {
   WALK: 0x03,
   READ_MEMORY: 0x04,
   WRITE_MEMORY: 0x05,
+  BECOME_REGISTRY: 0x06,
   READY: 0x07,
 } as const;
 
@@ -112,6 +113,11 @@ export class Client extends EventEmitter<ClientEvents> {
   walk(direction: number): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     this.ws.send(new Uint8Array([MessageType.WALK, direction]));
+  }
+
+  becomeRegistry(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(new Uint8Array([MessageType.BECOME_REGISTRY]));
   }
 
   readMemory(offsets: number[], size: number): Promise<Uint8Array> {
