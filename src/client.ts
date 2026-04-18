@@ -22,7 +22,7 @@ export type ClientEvents = {
 };
 
 export class Client extends EventEmitter<ClientEvents> {
-  readonly pid: number;
+  readonly name: string;
   readonly port: number;
   readonly readFile: (path: string) => Promise<ArrayBuffer>;
   private ws: WebSocket | null = null;
@@ -30,9 +30,9 @@ export class Client extends EventEmitter<ClientEvents> {
   private _pendingMemory = new Map<number, PendingMemory>();
   private _onReady: (() => void) | null = null;
 
-  constructor(pid: number, port: number, readFile: (path: string) => Promise<ArrayBuffer>) {
+  constructor(name: string, port: number, readFile: (path: string) => Promise<ArrayBuffer>) {
     super();
-    this.pid = pid;
+    this.name = name;
     this.port = port;
     this.readFile = readFile;
   }

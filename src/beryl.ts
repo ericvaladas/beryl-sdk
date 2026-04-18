@@ -25,7 +25,7 @@ function promoteToRegistry(port: number): Promise<void> {
 export type BerylEvents = {
   ready: () => void;
   clientConnected: (data: { client: Client; name: string }) => void;
-  clientDisconnected: (data: { pid: number }) => void;
+  clientDisconnected: (data: { name: string }) => void;
 };
 
 interface PendingFile {
@@ -34,7 +34,7 @@ interface PendingFile {
 }
 
 export class Beryl extends EventEmitter<BerylEvents> {
-  private clientMap = new Map<number, Client>();
+  private clientMap = new Map<string, Client>();
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hasScanned = false;
@@ -72,7 +72,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
           this.handleAdd(message.client);
           break;
         case 'remove':
-          this.handleRemove(message.pid);
+          this.handleRemove(message.name);
           break;
         case 'settings':
           if (this._pendingSettings) {
@@ -129,8 +129,8 @@ export class Beryl extends EventEmitter<BerylEvents> {
     this.ws.send(JSON.stringify({ type: 'setSettings', allowedOrigins: origins }));
   }
 
-  getClient(pid: number): Client | undefined {
-    return this.clientMap.get(pid);
+  getClient(name: string): Client | undefined {
+    return this.clientMap.get(name);
   }
 
   private handleFileResponse(data: ArrayBuffer): void {
@@ -153,20 +153,20 @@ export class Beryl extends EventEmitter<BerylEvents> {
     }
   }
 
-  private handleAdd({ pid, port, name }: ClientDescriptor): void {
+  private handleAdd({ port, name }: ClientDescriptor): void {
     if (!name) return;
 
-    let client = this.clientMap.get(pid);
+    let client = this.clientMap.get(name);
 
     if (!client) {
-      client = new Client(pid, port, (path) => this.readFile(path));
+      client = new Client(name, port, (path) => this.readFile(path));
 
       client.on('close', () => {
-        this.clientMap.delete(pid);
-        this.emit('clientDisconnected', { pid });
+        this.clientMap.delete(name);
+        this.emit('clientDisconnected', { name });
       });
 
-      this.clientMap.set(pid, client);
+      this.clientMap.set(name, client);
 
       client
         .connect()
@@ -174,26 +174,26 @@ export class Beryl extends EventEmitter<BerylEvents> {
           this.emit('clientConnected', { client: client!, name });
         })
         .catch((err) => {
-          console.error(`Failed to connect to client PID ${pid}:`, err);
-          this.clientMap.delete(pid);
+          console.error(`Failed to connect to client ${name}:`, err);
+          this.clientMap.delete(name);
         });
     } else {
       this.emit('clientConnected', { client, name });
     }
   }
 
-  private handleRemove(pid: number): void {
-    const client = this.clientMap.get(pid);
+  private handleRemove(name: string): void {
+    const client = this.clientMap.get(name);
     if (client) {
       client.close();
     }
   }
 
   private handleInit(clientList: ClientDescriptor[]): void {
-    const activePids = new Set(clientList.map((c) => c.pid));
+    const activeNames = new Set(clientList.map((c) => c.name));
 
-    for (const [pid, client] of this.clientMap) {
-      if (!activePids.has(pid)) {
+    for (const [name, client] of this.clientMap) {
+      if (!activeNames.has(name)) {
         client.close();
       }
     }
