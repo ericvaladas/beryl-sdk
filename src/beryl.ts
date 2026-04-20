@@ -131,10 +131,6 @@ export class Beryl extends EventEmitter<BerylEvents> {
     this.ws.send(JSON.stringify({ type: 'setSettings', allowedOrigins: origins }));
   }
 
-  getClient(name: string): Client | undefined {
-    return this.clientMap.get(name);
-  }
-
   private handleFileResponse(data: ArrayBuffer): void {
     const view = new DataView(data);
     if (data.byteLength < 5) return;
