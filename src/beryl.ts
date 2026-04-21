@@ -4,6 +4,7 @@ import type { ClientDescriptor, Settings } from './types';
 
 const REGISTRY_URL = 'ws://localhost:21000';
 const RECONNECT_INTERVAL = 2000;
+const REQUEST_TIMEOUT_MS = 10000;
 const CLIENT_PORT_START = 21001;
 const CLIENT_PORT_END = 21020;
 
@@ -23,6 +24,7 @@ function promoteToRegistry(port: number): Promise<void> {
 
 export type BerylEvents = {
   ready: () => void;
+  error: (error: Error) => void;
   clientConnected: (data: { client: Client; name: string }) => void;
   clientDisconnected: (data: { name: string }) => void;
 };
@@ -30,6 +32,13 @@ export type BerylEvents = {
 interface PendingFile {
   resolve: (value: ArrayBuffer) => void;
   reject: (reason: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+interface PendingSettings {
+  resolve: (settings: Settings) => void;
+  reject: (reason: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 export class Beryl extends EventEmitter<BerylEvents> {
@@ -39,7 +48,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
   private hasScanned = false;
   private _nextFileId = 1;
   private _pendingFiles = new Map<number, PendingFile>();
-  private _pendingSettings: ((settings: Settings) => void) | null = null;
+  private _pendingSettings: PendingSettings[] = [];
   private _ready = false;
 
   get ready(): boolean {
@@ -73,22 +82,21 @@ export class Beryl extends EventEmitter<BerylEvents> {
         case 'remove':
           this.handleRemove(message.name);
           break;
-        case 'settings':
-          if (this._pendingSettings) {
+        case 'settings': {
+          const pending = this._pendingSettings.shift();
+          if (pending) {
+            clearTimeout(pending.timer);
             const { type, ...settings } = message;
-            this._pendingSettings(settings as Settings);
-            this._pendingSettings = null;
+            pending.resolve(settings as Settings);
           }
           break;
+        }
       }
     };
 
     this.ws.onclose = () => {
       this._ready = false;
-      for (const [, { reject }] of this._pendingFiles) {
-        reject(new Error('WebSocket disconnected'));
-      }
-      this._pendingFiles.clear();
+      this.rejectAllPending(new Error('WebSocket disconnected'));
 
       const existing = this.clientMap.values().next().value;
       if (existing) {
@@ -100,7 +108,9 @@ export class Beryl extends EventEmitter<BerylEvents> {
       this.scheduleReconnect();
     };
 
-    this.ws.onerror = () => {};
+    this.ws.onerror = () => {
+      this.emit('error', new Error('Registry WebSocket error'));
+    };
   }
 
   readFile(path: string): Promise<ArrayBuffer> {
@@ -110,7 +120,11 @@ export class Beryl extends EventEmitter<BerylEvents> {
 
     const id = this._nextFileId++;
     return new Promise((resolve, reject) => {
-      this._pendingFiles.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        this._pendingFiles.delete(id);
+        reject(new Error('File request timed out'));
+      }, REQUEST_TIMEOUT_MS);
+      this._pendingFiles.set(id, { resolve, reject, timer });
       this.ws!.send(JSON.stringify({ type: 'file', id, path }));
     });
   }
@@ -120,15 +134,40 @@ export class Beryl extends EventEmitter<BerylEvents> {
       return Promise.reject(new Error('WebSocket not connected'));
     }
 
-    return new Promise((resolve) => {
-      this._pendingSettings = (settings) => resolve(settings.allowedOrigins ?? []);
+    return new Promise((resolve, reject) => {
+      const entry: PendingSettings = {
+        resolve: (settings) => resolve(settings.allowedOrigins ?? []),
+        reject,
+        timer: setTimeout(() => {
+          const idx = this._pendingSettings.indexOf(entry);
+          if (idx !== -1) this._pendingSettings.splice(idx, 1);
+          reject(new Error('Settings request timed out'));
+        }, REQUEST_TIMEOUT_MS),
+      };
+      this._pendingSettings.push(entry);
       this.ws!.send(JSON.stringify({ type: 'getSettings' }));
     });
   }
 
   setAllowedOrigins(origins: string[]): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
     this.ws.send(JSON.stringify({ type: 'setSettings', allowedOrigins: origins }));
+  }
+
+  private rejectAllPending(error: Error): void {
+    for (const [, { reject, timer }] of this._pendingFiles) {
+      clearTimeout(timer);
+      reject(error);
+    }
+    this._pendingFiles.clear();
+
+    for (const { reject, timer } of this._pendingSettings) {
+      clearTimeout(timer);
+      reject(error);
+    }
+    this._pendingSettings.length = 0;
   }
 
   private handleFileResponse(data: ArrayBuffer): void {
@@ -141,6 +180,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
     const entry = this._pendingFiles.get(id);
     if (!entry) return;
     this._pendingFiles.delete(id);
+    clearTimeout(entry.timer);
 
     if (status === 0x00) {
       entry.resolve(data.slice(5));

@@ -11,9 +11,12 @@ export const MessageType = {
   READY: 0x07,
 } as const;
 
+const REQUEST_TIMEOUT_MS = 10000;
+
 interface PendingMemory {
   resolve: (value: Uint8Array | boolean) => void;
   reject: (reason: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 export type ClientEvents = {
@@ -82,6 +85,7 @@ export class Client extends EventEmitter<ClientEvents> {
       const pending = this._pendingMemory.get(requestId);
       if (pending) {
         this._pendingMemory.delete(requestId);
+        clearTimeout(pending.timer);
         if (type === MessageType.READ_MEMORY) {
           pending.resolve(body.slice(1));
         } else {
@@ -100,7 +104,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   private sendFramed(type: number, packet: Packet): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
 
     const body = packet.buffer();
     const frame = new Uint8Array(1 + body.length);
@@ -111,7 +117,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   walk(direction: number): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
     this.ws.send(new Uint8Array([MessageType.WALK, direction]));
   }
 
@@ -144,9 +152,14 @@ export class Client extends EventEmitter<ClientEvents> {
     view.setUint32(pos, size, true);
 
     return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pendingMemory.delete(id);
+        reject(new Error('Memory read timed out'));
+      }, REQUEST_TIMEOUT_MS);
       this._pendingMemory.set(id, {
         resolve: resolve as (value: Uint8Array | boolean) => void,
         reject,
+        timer,
       });
       this.ws!.send(buf);
     });
@@ -178,15 +191,26 @@ export class Client extends EventEmitter<ClientEvents> {
     new Uint8Array(buf, pos).set(data);
 
     return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pendingMemory.delete(id);
+        reject(new Error('Memory write timed out'));
+      }, REQUEST_TIMEOUT_MS);
       this._pendingMemory.set(id, {
         resolve: resolve as (value: Uint8Array | boolean) => void,
         reject,
+        timer,
       });
       this.ws!.send(buf);
     });
   }
 
   close(): void {
+    for (const [, { reject, timer }] of this._pendingMemory) {
+      clearTimeout(timer);
+      reject(new Error('WebSocket disconnected'));
+    }
+    this._pendingMemory.clear();
+
     if (this.ws) {
       const ws = this.ws;
       this.ws = null;
