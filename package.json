@@ -1,5 +1,5 @@
 {
-  "name": "@ericvaladas/beryl",
+  "name": "beryl-sdk",
   "version": "0.8.2",
   "description": "TypeScript SDK for building Dark Ages tools",
   "type": "module",
@@ -20,9 +20,6 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "prepare": "tsup"
-  },
-  "publishConfig": {
-    "@ericvaladas:registry": "https://npm.pkg.github.com"
   },
   "devDependencies": {
     "tsup": "^8.4.0",
