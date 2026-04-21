@@ -29,22 +29,16 @@ function toHex(value: number): string {
 
 export class Packet {
   opcode: number;
-  sequence: number;
   position: number;
-  body: number[];
-  data: number[];
+  private body: number[];
 
   constructor(arg: number | Uint8Array) {
     if (typeof arg === 'number') {
       this.opcode = arg;
-      this.sequence = 0;
       this.position = 0;
       this.body = [];
-      this.data = [];
     } else {
-      this.data = Array.from(arg);
       this.opcode = arg[0];
-      this.sequence = 0;
       this.position = 0;
       this.body = Array.from(arg.slice(1));
     }
@@ -60,9 +54,9 @@ export class Packet {
       .join(' ');
   }
 
-  read(length: number): number[] | 0 {
+  read(length: number): number[] {
     if (this.position + length > this.body.length) {
-      return 0;
+      return [];
     }
 
     const buffer = this.body.slice(this.position, this.position + length);
