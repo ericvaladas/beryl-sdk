@@ -72,6 +72,7 @@ All request/response methods time out after 10 seconds.
 | `error` | `Error` — agent connection error. |
 | `clientConnected` | `{ client: Client, name: string }` |
 | `clientDisconnected` | `{ name: string }` |
+| `version` | `{ agentVersion: string \| null, minVersion: string, updateRequired: boolean }` — emitted on the first agent connect and again whenever the agent reports a different version. `updateRequired` is `true` if the agent is below the SDK's minimum (or doesn't report a version). |
 
 ### `class Client`
 

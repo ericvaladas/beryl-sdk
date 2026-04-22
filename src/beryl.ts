@@ -7,6 +7,23 @@ const RECONNECT_INTERVAL = 2000;
 const REQUEST_TIMEOUT_MS = 10000;
 const CLIENT_PORT_START = 21001;
 const CLIENT_PORT_END = 21020;
+const MIN_AGENT_VERSION = '1.0.0';
+
+function parseSemver(version: string): [number, number, number] | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareSemver(a: string, b: string): number {
+  const parsedA = parseSemver(a);
+  const parsedB = parseSemver(b);
+  if (!parsedA || !parsedB) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (parsedA[i] !== parsedB[i]) return parsedA[i] < parsedB[i] ? -1 : 1;
+  }
+  return 0;
+}
 
 function promoteToRegistry(port: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -27,6 +44,11 @@ export type BerylEvents = {
   error: (error: Error) => void;
   clientConnected: (data: { client: Client; name: string }) => void;
   clientDisconnected: (data: { name: string }) => void;
+  version: (data: {
+    agentVersion: string | null;
+    minVersion: string;
+    updateRequired: boolean;
+  }) => void;
 };
 
 interface PendingFile {
@@ -50,6 +72,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
   private _pendingFiles = new Map<number, PendingFile>();
   private _pendingSettings: PendingSettings[] = [];
   private _ready = false;
+  private _lastEmittedVersion: string | null | undefined = undefined;
 
   get ready(): boolean {
     return this._ready;
@@ -74,6 +97,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
       const message = JSON.parse(event.data as string);
       switch (message.type) {
         case 'init':
+          this.checkAgentVersion(message.agentVersion ?? null);
           this.handleInit(message.clients);
           break;
         case 'add':
@@ -225,6 +249,17 @@ export class Beryl extends EventEmitter<BerylEvents> {
     if (client) {
       client.close();
     }
+  }
+
+  private checkAgentVersion(agentVersion: string | null): void {
+    if (this._lastEmittedVersion === agentVersion) return;
+    this._lastEmittedVersion = agentVersion;
+    const updateRequired = !agentVersion || compareSemver(agentVersion, MIN_AGENT_VERSION) < 0;
+    this.emit('version', {
+      agentVersion,
+      minVersion: MIN_AGENT_VERSION,
+      updateRequired,
+    });
   }
 
   private handleInit(clientList: ClientDescriptor[]): void {
