@@ -1,29 +1,14 @@
 import { Client, MessageType } from './client';
 import EventEmitter from './event-emitter';
+import { compareSemver } from './semver';
 import type { ClientDescriptor, Settings } from './types';
 
-const REGISTRY_URL = 'ws://localhost:21000';
-const RECONNECT_INTERVAL = 2000;
-const REQUEST_TIMEOUT_MS = 10000;
+const REGISTRY_PORT = 21000;
 const CLIENT_PORT_START = 21001;
 const CLIENT_PORT_END = 21020;
+const RECONNECT_INTERVAL = 2000;
+const REQUEST_TIMEOUT_MS = 10000;
 const MIN_AGENT_VERSION = '1.0.0';
-
-function parseSemver(version: string): [number, number, number] | null {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
-function compareSemver(a: string, b: string): number {
-  const parsedA = parseSemver(a);
-  const parsedB = parseSemver(b);
-  if (!parsedA || !parsedB) return 0;
-  for (let i = 0; i < 3; i++) {
-    if (parsedA[i] !== parsedB[i]) return parsedA[i] < parsedB[i] ? -1 : 1;
-  }
-  return 0;
-}
 
 function promoteToRegistry(port: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -79,7 +64,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
   }
 
   connect(): void {
-    this.ws = new WebSocket(REGISTRY_URL);
+    this.ws = new WebSocket(`ws://localhost:${REGISTRY_PORT}`);
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
