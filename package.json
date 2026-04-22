@@ -1,8 +1,22 @@
 {
   "name": "beryl-sdk",
-  "version": "0.8.2",
+  "version": "1.0.0",
   "description": "TypeScript SDK for building Dark Ages tools",
   "license": "MIT",
+  "author": "Eric Valadas",
+  "homepage": "https://github.com/ericvaladas/beryl-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ericvaladas/beryl-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ericvaladas/beryl-sdk/issues"
+  },
+  "keywords": [
+    "dark ages",
+    "beryl",
+    "proxy"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -20,7 +34,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "prepare": "tsup",
+    "prepublishOnly": "tsup",
     "format": "prettier --write src",
     "format:check": "prettier --check src"
   },
