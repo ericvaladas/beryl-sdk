@@ -116,16 +116,17 @@ export class Client extends EventEmitter<ClientEvents> {
     this.ws.send(frame);
   }
 
+  /** @internal */
+  _becomeRegistry(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(new Uint8Array([MessageType.BECOME_REGISTRY]));
+  }
+
   walk(direction: number): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected');
     }
     this.ws.send(new Uint8Array([MessageType.WALK, direction]));
-  }
-
-  becomeRegistry(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(new Uint8Array([MessageType.BECOME_REGISTRY]));
   }
 
   readMemory(offsets: number[], size: number): Promise<Uint8Array> {

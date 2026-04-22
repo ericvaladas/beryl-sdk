@@ -109,7 +109,7 @@ export class Beryl extends EventEmitter<BerylEvents> {
 
       const existing = this.clientMap.values().next().value;
       if (existing) {
-        existing.becomeRegistry();
+        existing._becomeRegistry();
       } else if (!this.hasScanned) {
         this.hasScanned = true;
         this.scanForClients();

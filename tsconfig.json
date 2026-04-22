@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "declaration": true,
+    "stripInternal": true,
     "outDir": "dist",
     "rootDir": "src",
     "esModuleInterop": true,
