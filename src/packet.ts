@@ -233,14 +233,12 @@ export class Packet {
   writeString(value: string): void {
     const buffer = Array.from(new TextEncoder().encode(value));
     this.body = this.body.concat(buffer);
-    this.position += buffer.length;
   }
 
   writeString8(value: string): void {
     const buffer = Array.from(new TextEncoder().encode(value));
     this.body.push(buffer.length);
     this.body = this.body.concat(buffer);
-    this.position += buffer.length + 1;
   }
 
   writeString16(value: string): void {
@@ -248,6 +246,5 @@ export class Packet {
     this.body.push((buffer.length >> 8) & 0xff);
     this.body.push(buffer.length & 0xff);
     this.body = this.body.concat(buffer);
-    this.position += buffer.length + 2;
   }
 }
