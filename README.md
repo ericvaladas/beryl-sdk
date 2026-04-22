@@ -1,6 +1,6 @@
 # beryl-sdk
 
-TypeScript SDK for building Dark Ages tools. Connects to a local Beryl agent over WebSocket, discovers running game clients, and exposes an API for reading/writing packets, walking the character, reading files, and reading/writing process memory.
+TypeScript SDK for Dark Ages tools that run in the browser. Connects to a local Beryl agent over WebSocket, discovers running game clients, and exposes an API for reading/writing packets, walking the character, reading files, and reading/writing process memory.
 
 ## Install
 
