@@ -9,6 +9,7 @@ export const MessageType = {
   WRITE_MEMORY: 0x05,
   BECOME_REGISTRY: 0x06,
   READY: 0x07,
+  WINDOW_FOCUS: 0x08,
 } as const;
 
 const REQUEST_TIMEOUT_MS = 10000;
@@ -22,6 +23,7 @@ interface PendingMemory {
 export type ClientEvents = {
   sent: (packet: Packet) => void;
   received: (packet: Packet) => void;
+  focus: (focused: boolean) => void;
   close: () => void;
 };
 
@@ -92,6 +94,8 @@ export class Client extends EventEmitter<ClientEvents> {
           pending.resolve(body[1] === 0);
         }
       }
+    } else if (type === MessageType.WINDOW_FOCUS) {
+      this.emit('focus', body[0] === 1);
     }
   }
 

@@ -107,7 +107,10 @@ Walking has a dedicated method because the game maintains an internal walk seque
 | --- | --- |
 | `sent` | `Packet` observed going client→server. |
 | `received` | `Packet` observed going server→client. |
+| `focus` | `boolean` — `true` when the game window gains OS focus, `false` when it loses focus. Emitted on connect with the current state, then on each change. |
 | `close` | `()` — connection closed. |
+
+The `focus` signal comes from the Win32 foreground window and is reliable on Windows. Under Wine (e.g. running the game on macOS) the game never receives the Win32 focus change, so `focus` reports `true` on connect and never fires again.
 
 ### `class Packet`
 
